@@ -44,8 +44,9 @@ echo 5. Check Updates
 echo 6. Switch Game Filter (%GameFilterStatus%)
 echo 7. Switch ipset (%IPsetStatus%)
 echo 8. Update ipset list
+echo 9. Test strategies
 echo 0. Exit
-set /p menu_choice=Enter choice (0-8): 
+set /p menu_choice=Enter choice (0-9):
 
 if "%menu_choice%"=="1" goto service_install
 if "%menu_choice%"=="2" goto service_remove
@@ -55,6 +56,7 @@ if "%menu_choice%"=="5" goto service_check_updates
 if "%menu_choice%"=="6" goto game_switch
 if "%menu_choice%"=="7" goto ipset_switch
 if "%menu_choice%"=="8" goto ipset_update
+if "%menu_choice%"=="9" goto auto_test_strategies
 if "%menu_choice%"=="0" exit /b
 goto menu
 
@@ -76,6 +78,7 @@ if !errorlevel!==0 (
 
 pause
 goto menu
+
 
 :test_service
 set "ServiceName=%~1"
@@ -523,6 +526,48 @@ echo Finished
 
 pause
 goto menu
+
+:auto_test_strategies
+chcp 65001 > nul
+cls
+setlocal EnableDelayedExpansion
+set "fastest_time=1000000"
+set "fastest_file="
+for %%f in ("general*.bat") do (
+    call :test_strategy "%%f"
+    if "!strategy_working!"=="1" if !strategy_time! LSS !fastest_time! (
+        set "fastest_time=!strategy_time!"
+        set "fastest_file=%%f"
+    )
+)
+if defined fastest_file (
+    echo Самая быстрая стратегия: !fastest_file! (!fastest_time! мс)
+    echo Оптимизируйте этот bat файл для ещё большей скорости.
+) else (
+    echo Рабочие стратегии не найдены.
+)
+endlocal
+pause
+goto menu
+
+:test_strategy
+setlocal
+set "bat_file=%~1"
+set "strategy_working=0"
+set "strategy_time=0"
+echo Тестирование !bat_file!...
+start "" /min cmd /c "!bat_file!"
+timeout /t 3 >nul
+for /f "delims=" %%A in ('powershell -Command "$t=Measure-Command{try{Invoke-WebRequest https://discord.com -TimeoutSec 5|Out-Null}catch{exit 1}};$t.TotalMilliseconds" 2^>nul') do set "strategy_time=%%A"
+if defined strategy_time (
+    set "strategy_working=1"
+)
+taskkill /f /im winws.exe >nul 2>&1
+endlocal & (
+    set "strategy_working=%strategy_working%"
+    set "strategy_time=%strategy_time%"
+)
+exit /b
 
 :: Utility functions
 
