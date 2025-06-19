@@ -44,8 +44,9 @@ echo 5. Check Updates
 echo 6. Switch Game Filter (%GameFilterStatus%)
 echo 7. Switch ipset (%IPsetStatus%)
 echo 8. Update ipset list
+echo 9. Find fastest strategy
 echo 0. Exit
-set /p menu_choice=Enter choice (0-8): 
+set /p menu_choice=Enter choice (0-9):
 
 if "%menu_choice%"=="1" goto service_install
 if "%menu_choice%"=="2" goto service_remove
@@ -55,6 +56,7 @@ if "%menu_choice%"=="5" goto service_check_updates
 if "%menu_choice%"=="6" goto game_switch
 if "%menu_choice%"=="7" goto ipset_switch
 if "%menu_choice%"=="8" goto ipset_update
+if "%menu_choice%"=="9" goto auto_test
 if "%menu_choice%"=="0" exit /b
 goto menu
 
@@ -523,6 +525,48 @@ echo Finished
 
 pause
 goto menu
+
+:: AUTO TEST ==========================
+:auto_test
+chcp 437 > nul
+cls
+
+set "best_file="
+set "best_time=9999999"
+for %%f in ("general*.bat") do (
+    if /I not "%%~nxf"=="service.bat" (
+        call :test_bat "%%f"
+        if !errorlevel!==0 (
+            if !TEST_RESULT! LSS !best_time! (
+                set "best_time=!TEST_RESULT!"
+                set "best_file=%%f"
+            )
+        )
+    )
+)
+
+if defined best_file (
+    echo Best strategy: !best_file! (!best_time! ms)
+    set "CHOICE="
+    set /p "CHOICE=Open for optimization? (Y/N) "
+    if /I "!CHOICE!"=="Y" start "" notepad "!best_file!"
+) else (
+    echo No working strategy found
+)
+
+pause
+goto menu
+
+:test_bat
+set "TEST_RESULT="
+call "%~1"
+timeout /t 3 >nul
+for /f "delims=" %%A in ('powershell -command "try{(Measure-Command {Invoke-WebRequest -Uri \"https://discord.com\" -Method Head -TimeoutSec 5 -ErrorAction Stop}).TotalMilliseconds}catch{\"fail\"}" 2^>nul') do set "time=%%A"
+taskkill /IM winws.exe /F >nul 2>&1
+if not defined time exit /b 1
+if "%time%"=="fail" exit /b 1
+set "TEST_RESULT=%time%"
+exit /b 0
 
 :: Utility functions
 
